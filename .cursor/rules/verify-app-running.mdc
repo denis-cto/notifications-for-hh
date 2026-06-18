@@ -1,0 +1,62 @@
+---
+description: Verify a backend app starts cleanly via nx serve with infra up first
+alwaysApply: true
+---
+
+# Verify Backend App Is Running
+
+Confirm backend app starts without runtime errors — follow sequence.
+
+## 1. Local infra first
+
+Postgres + Redis up before `serve`. See `docker-local-infra.mdc`:
+
+```bash
+cd backend
+npm run docker:up
+docker compose exec postgres pg_isready -U resharing
+docker compose exec redis redis-cli ping
+```
+
+No app start if infra missing or unhealthy.
+
+## 2. Node version
+
+From `backend/`:
+
+```bash
+nvm use 25
+```
+
+## 3. Start the app (only this pattern)
+
+Always **serve** via Nx — never ad-hoc `node`, `ts-node`, or direct `nest start`:
+
+```bash
+cd backend
+npx nx run <appName> -t serve
+```
+
+Examples: `npx nx run location-service -t serve`, `npx nx run frontend-api -t serve`.
+
+Background when smoke check only.
+
+## 4. Watch logs for 10 seconds
+
+After start, monitor stdout/stderr **10 seconds**. **Startup failure** (fix before claiming app runs):
+
+- `ERROR [Nest` / `Nest can't` / `NestFactory`
+- `ExceptionHandler` / unhandled promise rejection stack traces
+- `EADDRINUSE`, `ECONNREFUSED` (DB/Redis), Prisma/migration connection errors
+- Process exits or no successful listen line
+
+**Healthy start** when:
+
+- `Nest application successfully started`
+- `Listening on` / `Application is running on`
+
+Errors within 10s → stop serve, report log excerpt, fix root cause — no broken server left running.
+
+## 5. Cleanup
+
+After verification, stop background `serve` (Ctrl+C or kill shell job)

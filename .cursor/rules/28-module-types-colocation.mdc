@@ -1,0 +1,46 @@
+---
+description: Types/interfaces/enums → types.ts at module folder root, not with class
+globs: backend/**/*.ts
+alwaysApply: false
+---
+
+# Types colocation (`types.ts`)
+
+Detail for [app-module-structure.mdc](mdc:.cursor/rules/app-module-structure.mdc): **`interface` / `type` / `enum` in `types.ts`** same folder as module (not beside main class file).
+
+## Rule
+
+In module folder (e.g. `backend/apps/search-service/src/app/search/`):
+
+- File exports **`export class`** (main service/class) → no exported `type` / `interface` / `enum` in same file.
+- Put in **`types.ts` in that directory** (default: one `types.ts` per folder; not `foo.types.ts` unless repo exception exists).
+
+In class file:
+
+```typescript
+import type { SomeType, ISomeParams } from './types';
+```
+
+Barrels: re-export from `index.ts` only when folder already uses barrel pattern in same app.
+
+## Exceptions
+
+- **`*.spec.ts` / `*.test.ts`:** local fixture/helper types OK in test file; no move to module `types.ts`.
+- **`.tsx`:** glob is `*.ts` only; component props separate from "class + types" split.
+
+## Bad / good
+
+```typescript
+// BAD — types next to class in one file
+export type Status = 'a' | 'b';
+export interface Params { x: number; }
+export class Service { }
+
+// GOOD — types.ts
+export type Status = 'a' | 'b';
+export interface Params { x: number; }
+
+// GOOD — service.ts
+import type { Params, Status } from './types';
+export class Service { }
+```

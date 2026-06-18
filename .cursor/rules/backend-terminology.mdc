@@ -1,0 +1,12 @@
+---
+description: Backend monorepo and "all apps" terminology
+alwaysApply: true
+---
+
+# Backend Terminology
+
+- **Backend** = `backend/` directory — monorepo root (not whole repo).
+- **All apps** = every first-level folder under `backend/apps/`, excluding `*-e2e`. Set can change — "all apps" = apps in that folder now (e.g. frontend-api, booking-service, location-service, payment-service, search-service, worker, provider-aggregation-service, events-service, provider-adapter-*, etc.).
+- **Admin panel** = `fleet/apps/fleet-admin-api` + `admin/` SPA (Fleet FMS, not part of `backend/`).
+
+User says "backend" or @backend/: treat `backend/` as root. "all apps" → apply to each app in `backend/apps/` (excluding *-e2e).

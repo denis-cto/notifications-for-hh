@@ -1,0 +1,59 @@
+---
+description: Services must not access DB; use *.repository.ts with NestJS DI
+alwaysApply: true
+---
+
+# Service / Repository Layer
+
+Services hold business logic. Repositories hold all database access. Services must not know how the database is designed.
+
+## Services (`*.service.ts`)
+
+- Business logic, orchestration, validation, domain errors.
+- **Must not** inject `PrismaService`, import from `.prisma/client-*`, or call Prisma APIs (`findMany`, `$transaction`, etc.).
+- Inject repositories via NestJS constructor DI; call domain-named repository methods only.
+
+## Repositories (`*.repository.ts`)
+
+- All Prisma/DB operations. Only layer that imports Prisma types and talks to tables.
+- File: `<domain>.repository.ts` in the same module folder as the service.
+- Class: `@Injectable()`, `PascalCase` ending in `Repository` (e.g. `PhoneVerificationRepository`).
+- Methods: verb + domain intent (`findActiveByPhone`, `markConsumed`) — not raw Prisma API names at call sites.
+
+## NestJS DI
+
+```typescript
+@Module({
+  imports: [PrismaModule],
+  providers: [PhoneVerificationRepository],
+  exports: [PhoneVerificationRepository],
+})
+export class PhoneVerificationModule {}
+
+// service — repository only, no PrismaService
+constructor(private readonly phoneVerificationRepo: PhoneVerificationRepository) {}
+```
+
+Reference: `backend/apps/booking-service/src/app/outbox/outbox-event.repository.ts`.
+
+## Transactions
+
+- `$transaction` lives in the repository (or a repository method accepts optional `tx`; a coordinating method wraps the transaction).
+- Service calls one repository method; does not assemble raw Prisma queries across tables.
+
+## Bad / good
+
+```typescript
+// ❌ BAD — Prisma in service
+constructor(private readonly prisma: PrismaService) {}
+await this.prisma.phoneVerificationCode.findFirst({ where: { ... } });
+
+// ✅ GOOD — repository encapsulates DB; service uses domain methods
+async findPending(limit = 100, tx?: Prisma.TransactionClient): Promise<OutboxEvent[]> { ... }
+const events = await this.outboxRepository.findPending(50);
+```
+
+## Scope
+
+- Applies to all `backend/apps/*` and `backend/libs/*` with services.
+- Forward-looking: new code and refactors follow this rule; controllers/gRPC handlers call services only.

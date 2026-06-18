@@ -1,0 +1,53 @@
+---
+description: Debug errors on dev K8s — kubectl logs + GitLab CI after push to dev
+alwaysApply: true
+---
+
+# Debug on Dev
+
+**Trigger:** user says "debug on dev" (or clearly means investigate dev environment errors).
+
+## Phase 1 — Inspect pods
+
+Follow **k8s-kubectl-kubeconfig** rule first (`export KUBECONFIG=…` in same shell).
+
+Use namespace **`dev`** (`dev` branch deploys here per `backend/.gitlab-ci.yml`).
+
+```bash
+kubectl get pods -n dev
+kubectl get pods -n dev -l app=<service-name>
+kubectl logs -n dev <pod> -c <container> --tail=200
+kubectl logs -n dev <pod> -c <container> --previous   # CrashLoopBackOff
+kubectl describe pod -n dev <pod>
+```
+
+**Service hints** (deployment names ≈ Helm app names):
+
+| Repo | GitLab | Examples |
+|------|--------|----------|
+| `backend/` | https://gitlab.mgt/autopilot/re-sharing/backend | `frontend-api`, `location-service`, `provider-adapter-autopilot`, … |
+| `fleet/` | https://gitlab.mgt/autopilot/re-sharing/fleet | `fleet-admin-api`, `fleet-catalog`, `fleet-broker-api`, `fleet-ingest-worker` |
+
+Infer repo from changed paths or service prefix (`fleet-*` → fleet).
+
+## Phase 2 — After push to `dev`
+
+Push to `dev` triggers CI automatically. Watch the matching pipeline:
+
+- Backend: https://gitlab.mgt/autopilot/re-sharing/backend/-/pipelines
+- Fleet: https://gitlab.mgt/autopilot/re-sharing/fleet/-/pipelines
+
+Check status via GitLab MCP (`pipeline-status`) when available; else from repo dir:
+
+```bash
+cd backend   # or fleet
+glab ci status
+```
+
+Stages: `generate-build-pipeline` → `build` → `deploy` → `rolling-update`. Wait for deploy/rolling-update success before assuming new code is live.
+
+Then re-run Phase 1: confirm pod rollout (`kubectl get pods -n dev`), tail logs for startup/migration/gRPC errors.
+
+## Phase 3 — Report
+
+Summarize: failing CI job (if any), log excerpts with pod/container name, whether issue persists after deploy.

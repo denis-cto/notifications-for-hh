@@ -1,0 +1,61 @@
+---
+description: Build changed backend apps after code changes; serve when NestJS DI may break
+alwaysApply: true
+---
+
+# Build Changed App After Chat
+
+**When**: Before finishing a task that changed code.
+
+**Goal**: Catch compile errors and NestJS module/DI failures before CI.
+
+## 1. Identify changed apps
+
+From edited paths:
+
+- `backend/apps/<appName>/` → `<appName>`
+- `fleet/apps/<appName>/` → `<appName>`
+
+Skip `*-e2e` apps. If only `backend/libs/` changed, build every app that imports that lib (or run `nx affected -t build` for those apps).
+
+## 2. Always build changed apps
+
+From `backend/` (or fleet root for fleet apps):
+
+```bash
+nvm use 25
+npx nx run <appName> -t build
+```
+
+Build **each** changed app. Fix errors; do not mark task done until build passes.
+
+## 3. Serve when DI/module wiring may break
+
+Also run `serve` (see `verify-app-running.mdc`) when changes touch:
+
+- `*.module.ts`, `app.module.ts`
+- `providers`, `imports`, `exports`, `controllers` in modules
+- New or moved services, repositories, guards, interceptors, gRPC handlers
+- `forwardRef`, dynamic modules, global module registration
+
+```bash
+cd backend
+npm run docker:up   # if app needs Postgres/Redis
+npx nx run <appName> -t serve
+```
+
+Watch logs **10 seconds**. **Fix before done** if you see:
+
+- `Nest can't resolve dependencies` / `UnknownDependenciesException`
+- `circular dependency` / `Nest cannot create the <Module> instance`
+- `ERROR [Nest` / `ExceptionHandler` on startup
+
+Healthy: `Nest application successfully started` / `Listening on`.
+
+Stop background `serve` after check.
+
+## 4. Order with other checks
+
+1. Build changed app(s) — this rule
+2. Serve smoke check — when DI-risk changes (this rule + `verify-app-running.mdc`)
+3. `npm run lint:fix` — `eslint-fix-after-chat.mdc`

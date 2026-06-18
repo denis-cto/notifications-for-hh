@@ -1,0 +1,37 @@
+---
+description: Autopilot 1C API, wiki 06.03.03, Postman in autopilot_api, adapter provider-adapter-autopilot
+alwaysApply: true
+---
+
+# Autopilot Provider (вики + Postman + адаптер)
+
+## Триггер темы
+
+**Autopilot**, **autopilot**, провайдер `autopilot`, адаптер АвтоПилот, API 1С для провайдера — источники ниже.
+
+## Порядок источников
+
+1. **Вики** — `backend.wiki/06-Provider-Integration-Architecture/06.03-Provider-Adapters/06.03.03-Autopilot-Adapter/`
+   - `06.03.03.05-Описание-API.md` — контракты HTTP, форматы дат, параметры
+   - `06.03.03.04-Реализация-в-адаптере.md` — архитектура, кэш, маппинг
+   - `06.03.03.01`, `06.03.03.02`, `06.03.03.03`, `06.03.03.06` — особенности API, Basic Auth, ACRISS, кэширование
+
+2. **OpenAPI и Postman** — `autopilot_api/`
+   - `autopilot_api/1c-api.yaml` — OpenAPI спецификация
+   - `autopilot_api/autopilot-1c-api.postman_collection.json` — коллекция запросов
+   - `autopilot_api/autopilot-1c-api.postman_environment.json`, `autopilot_api/api_with_real_ids/` — окружения и примеры
+
+3. **Код адаптера** — `backend/apps/provider-adapter-autopilot/` (целевой путь; приложение может ещё не существовать)
+
+## Postman
+
+- Правки примеров и структуры — коллекция под `autopilot_api/`, не `frontend-api/postman/`.
+- Согласовать с вики: URL, HTTP Basic Auth, форматы дат (`yyyy-MM-ddTHH:mm:ss` из `06.03.03.05`).
+
+## Граница с платформой
+
+Autopilot — **внешний** HTTP API 1С. Публичные REST — через `frontend-api` + правило `api-postman-sync`. Это правило не отменяет его.
+
+## Секреты
+
+Не копировать реальные учётные данные в новые файлы. В примерах — плейсхолдеры и переменные Postman (`{{username}}`, `{{password}}`).

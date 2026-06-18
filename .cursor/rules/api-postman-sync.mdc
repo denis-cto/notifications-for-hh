@@ -1,0 +1,51 @@
+---
+description: Keep gRPC, frontend-api, and Postman collection in sync; add examples with real seed data
+alwaysApply: true
+---
+
+# API and Postman Sync
+
+## gRPC → Frontend-API
+
+Any **gRPC endpoint** created, updated, or deleted:
+
+1. Update **frontend-api** with corresponding REST endpoint (proxy, translate params, map responses).
+2. Request/response params + error handling match gRPC contract.
+
+## Frontend-API → Postman
+
+Any **frontend-api endpoint** created, updated, or deleted:
+
+1. Update `backend/apps/frontend-api/postman/frontend-api.postman_collection.json`.
+2. Add/update endpoint in correct folder (Locations, Bookings, Search, Users, etc.).
+3. **Several examples** with real data that return results.
+
+## Postman Examples (Reference: Locations Search)
+
+Use **Locations search** as reference:
+
+- **Multiple examples per endpoint**: e.g. Search Moscow, Search Sochi, Search Berlin, Search by code=SVO, Search type=airport, etc.
+- **Real seed data**: IDs, slugs, emails, codes from seeds (location-service, booking-service, etc.).
+- **Descriptions**: What each example returns + which seed.
+- **Variants**: Different filters (status, type, countryCode), pagination, query params.
+
+### Where to Find Seed Data
+
+- `backend/apps/location-service/prisma/seed-data-russia.ts` — Russia cities, airports, paths
+- `backend/apps/booking-service/prisma/seed.ts`, `seed-data-bookings.ts` — bookings, customer emails (moscow-bookings@example.com, europe-bookings@example.com)
+- Collection `info.description` documents seed sources (e.g. "location-service (Russia, generated Renteon locations)").
+
+### Example Structure
+
+```json
+{
+  "name": "Search Moscow (city + airports + offices)",
+  "request": {
+    "method": "GET",
+    "url": { "raw": "{{baseUrl}}/api/v1/locations/search?q=moscow" }
+  },
+  "description": "Full-text search with descendant expansion. Returns Moscow city plus all related locations."
+}
+```
+
+POST/PUT: seed IDs in body (e.g. `pickup_location_id`, `dropoff_location_id` from location seed).

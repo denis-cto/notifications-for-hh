@@ -1,0 +1,22 @@
+---
+description: Fleet app HTTP/gRPC ports (302x/502x) must not overlap backend (301x/501x)
+globs: fleet/apps/**
+alwaysApply: false
+---
+
+# Fleet App Ports
+
+**k8s / deployed:** chart-level `restPort: 3000`, `grpcPort: 5000`, `inspectPort: 7000` (same as backend). Code defaults: `APP_PORT || 3000`, `GRPC_PORT || 5000`.
+
+**Local `nx serve`:** fleet `apps/*` use dedicated ports (see `fleet/README.md`). **Do not** reuse backend `301x` / `501x` values.
+
+| App | `APP_PORT` | `GRPC_PORT` |
+|-----|------------|-------------|
+| fleet-admin-api | 3020 | — |
+| fleet-catalog | 3021 | 5021 |
+| fleet-broker-api | 3022 | 5022 |
+| fleet-ingest-worker | 3023 | 5023 |
+
+When adding a fleet app: assign the next free `302x`/`502x` pair, document in `.env.example`, `fleet/README.md`, and update backend clients (e.g. `FLEET_*_GRPC_URL` on `provider-adapter-autopilot`).
+
+`fleet-admin-api` Postman: `baseUrl` = `http://localhost:3020`.

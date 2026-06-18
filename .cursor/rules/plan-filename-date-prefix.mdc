@@ -1,0 +1,27 @@
+---
+description: Prefix plan filenames with a YYMMDD date
+alwaysApply: true
+---
+
+# Plan Filename Date Prefix
+
+When creating a plan file in `.cursor/plans/`, prefix the filename with the current date in `%y%m%d_` (YYMMDD_) format.
+IF plan was built, it should be saved to built plans folder. If plan was not built, and left unbuilt, move to archived plan folder.
+
+## Pattern
+
+```
+.cursor/plans/<YYMMDD>_<original-plan-name>.plan.md
+```
+
+## Examples
+
+```
+# ❌ BAD
+.cursor/plans/autopilot_http_debug_logging_c4c87156.plan.md
+
+# ✅ GOOD (for 2026-05-11)
+.cursor/plans/260511_autopilot_http_debug_logging_c4c87156.plan.md
+```
+
+Use the actual current date (e.g. `260604` for 2026-06-04). Keep the rest of the original plan name unchanged.

@@ -1,0 +1,25 @@
+---
+description: Prevent NestJS guard dependency startup failures
+globs: backend/apps/**/src/app/**/*.ts
+alwaysApply: false
+---
+
+# NestJS Guard Dependencies
+
+`@UseGuards(SomeGuard)` on controllers — module must resolve guard + all constructor deps at startup.
+
+- Declare shared guards in auth/security module; export guard + modules/providers its constructor needs.
+- Guard gets new dep → update exporting module immediately.
+- Add/update DI smoke test compiling at least one feature module with guard without manually providing new dep.
+- `lint`, `build`, controller unit tests not enough — Nest DI errors often only at module compile/startup.
+
+Example:
+
+```typescript
+@Module({
+  imports: [UserClientModule, JwtModule.registerAsync(...)],
+  providers: [JwtAuthGuard],
+  exports: [UserClientModule, JwtModule, JwtAuthGuard],
+})
+export class AuthModule {}
+```

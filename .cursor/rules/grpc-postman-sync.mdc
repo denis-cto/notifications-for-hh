@@ -1,0 +1,63 @@
+---
+description: Keep gRPC debug Postman collection in sync when gRPC endpoints change
+alwaysApply: true
+---
+
+# gRPC Postman Collection Sync
+
+Any **gRPC endpoint** created, updated, or deleted in `backend/apps/*`:
+
+1. Update `backend/apps/frontend-api/postman/grpc-debug.postman_collection.json`.
+2. Group requests by service folder (e.g., "Location Service - Port 5004").
+3. Multiple examples per endpoint with real seed data.
+
+## Collection Structure
+
+Each service folder:
+
+- **List Services** request (grpcurl list command)
+- **Endpoint requests** with grpcurl commands in description
+- **Multiple examples** with different seed data
+
+## Service Ports Reference
+
+| Service | HTTP | gRPC |
+|---------|------|------|
+| frontend-api | 3000 | 5002 |
+| location-service | 3004 | 5004 |
+| search-service | 3006 | 5006 |
+| provider-aggregation-service | 3008 | 5008 |
+| tariff-service | 3014 | 5011 |
+| provider-adapter-renteon-aggregator | 3011 | 50052 |
+
+## Request Format
+
+```json
+{
+  "name": "Get Location - Athens Airport",
+  "request": {
+    "method": "POST",
+    "body": { "mode": "raw", "raw": "{\"id\": \"69be8f97-304d-50cf-af66-ca5df5444ec9\"}" },
+    "url": { "raw": "localhost:5004", "host": ["localhost"], "port": "5004" }
+  },
+  "description": "```bash\ngrpcurl -plaintext \\\n  -import-path /path/to/dist/apps/location-service \\\n  -proto location.v1/location.proto \\\n  -d '{\"id\": \"...\"}' \\\n  localhost:5004 location.v1.LocationService/GetById\n```"
+}
+```
+
+## Seed Data for Examples
+
+Real IDs from seed files:
+
+- `backend/apps/location-service/prisma/seed-data-russia.ts` — Russia locations
+- Athens Airport: `69be8f97-304d-50cf-af66-ca5df5444ec9` (GR-ATH-ATH)
+- Athens Downtown: `7049b00f-dc3c-5e2c-937c-896fe75a6ff9` (GR-ATH-DT)
+- Moscow SVO: `8a70b00c-a674-5b89-bd13-2f53d5e9be75` (RU-MSK-SVO)
+- Moscow City: `732303db-1fc2-55c6-86b0-3736a17b2acb` (RU-MSK)
+
+## Example Variants
+
+Examples for different scenarios:
+
+- Different locations (Athens, Moscow, Sochi)
+- Different currencies (EUR, RUB, USD)
+- Different driver ages and residences

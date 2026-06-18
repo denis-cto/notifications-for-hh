@@ -1,0 +1,41 @@
+---
+description: Avoid using --legacy-peer-deps with npm
+alwaysApply: true
+---
+
+# Avoid --legacy-peer-deps
+
+Do **not** use `--legacy-peer-deps` on npm commands (e.g. `npm install`, `npm ci`).
+
+## Why
+
+`--legacy-peer-deps` skips peer dep checks, hides incompatible versions → runtime errors or subtle bugs.
+
+## Alternatives
+
+1. **Fix peer deps**: Update packages to compatible versions or use `overrides` in `package.json` for known-good versions.
+2. **Use `overrides`** (npm 8.3+):
+
+   ```json
+   {
+     "overrides": {
+       "some-package": "1.2.3"
+     }
+   }
+   ```
+
+3. **Resolve conflicts**: Upgrade or downgrade conflicting packages so peer deps satisfied without flags.
+
+## Examples
+
+```bash
+# ❌ BAD
+npm install --legacy-peer-deps
+npm ci --legacy-peer-deps
+
+# ✅ GOOD
+npm install
+npm ci
+```
+
+No `--legacy-peer-deps` in Dockerfiles, CI configs, or scripts.

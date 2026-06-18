@@ -1,0 +1,22 @@
+---
+description: Run lint and build in changed apps after chat completes
+alwaysApply: true
+---
+
+# ESLint Fix After Chat Completion
+
+**When**: After chat finished code changes.
+
+**Action**: Run ESLint auto-fix on changed apps.
+
+## Command
+
+From `backend/` (monorepo root):
+
+```bash
+npm run lint:fix
+```
+
+Runs `lint --fix` on project only.
+
+Then `npm run affected` — lint, build, tests on all apps. Check output clean; fix errors; repeat until `npm run affected` passes.

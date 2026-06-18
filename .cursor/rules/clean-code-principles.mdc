@@ -1,0 +1,45 @@
+---
+description: KISS, DRY, YAGNI, SOLID, Clean Code—minimal code, comments only when needed
+alwaysApply: true
+---
+
+# Clean Code Principles
+
+## Core Principles
+
+- **KISS**: Simple solutions. No unnecessary abstractions.
+- **DRY**: No duplication. Extract shared logic.
+- **YAGNI**: No features until needed. Skip speculative code.
+- **SOLID**: Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion.
+- **Clean Code**: Clear names, small functions, low coupling, high cohesion.
+
+## Code Generation
+
+- **Write minimal code** for requirement.
+- **Comments**: Only non-obvious logic, edge cases, business rules not evident from code.
+
+## Examples
+
+```typescript
+// ❌ BAD: Over-engineered, speculative
+interface IUserRepositoryFactoryBuilder {
+  setConfig(config: Config): this;
+  build(): UserRepository;
+}
+// Complex factory when a simple function suffices
+
+// ✅ GOOD: Minimal, direct
+function createUserRepo(config: Config): UserRepository {
+  return new UserRepository(config);
+}
+```
+
+```typescript
+// ❌ BAD: Comment states the obvious
+// Increment count by 1
+count++;
+
+// ✅ GOOD: Comment explains why
+// Retry limit: 3 is the sweet spot per load-test results
+const MAX_RETRIES = 3;
+```

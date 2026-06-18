@@ -1,0 +1,52 @@
+---
+description: Start local Postgres and Redis via Docker Compose before backend work
+alwaysApply: true
+---
+
+# Local Docker Infra (Postgres + Redis)
+
+Before DB queries, migrations, seeds, or local backend apps — shared infra up.
+
+## Start
+
+From **`backend/`** (compose root; `backend/docker/` = init scripts/volumes only):
+
+```bash
+cd backend
+docker compose up postgres redis -d
+```
+
+Project script (waits for healthchecks):
+
+```bash
+cd backend
+npm run docker:up
+```
+
+## Verify
+
+```bash
+docker ps --filter name=postgres --filter name=redis
+```
+
+Expect:
+
+| Container | Status | Ports |
+|-----------|--------|-------|
+| `postgres` | Up (healthy) | `0.0.0.0:5432->5432/tcp` |
+| `redis` | Up (healthy) | `0.0.0.0:6379->6379/tcp` |
+
+Quick port check:
+
+```bash
+docker compose exec postgres pg_isready -U resharing
+docker compose exec redis redis-cli ping
+```
+
+(`PONG` from Redis; `pg_isready` exit 0 from Postgres.)
+
+## Port conflicts
+
+If `5432` or `6379` taken, `docker ps` shows conflicting container. Stop it or compose stack, restart from `backend/`.
+
+Default credentials: `resharing` / `resharing` (override via `PG_USERNAME` / `PG_PASSWORD` in env).

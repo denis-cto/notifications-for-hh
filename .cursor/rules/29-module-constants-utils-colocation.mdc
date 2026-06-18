@@ -1,0 +1,44 @@
+---
+description: Module-level constants → constants.ts, helpers → utils.ts (same folder as class)
+globs: backend/**/*.ts
+alwaysApply: false
+---
+
+# Constants and utils colocation
+
+Complements [app-module-structure.mdc](mdc:.cursor/rules/app-module-structure.mdc) and [28-module-types-colocation.mdc](mdc:.cursor/rules/28-module-types-colocation.mdc): **`types.ts`** = types; module **`const`** + top-level **`function`** helpers for main class → **`constants.ts`** and **`utils.ts`** in same module folder.
+
+## Rule
+
+In module folder under `backend/` (e.g. `backend/apps/notification-service/src/app/email-yandex-postbox/`):
+
+- **`constants.ts`** — URLs, numeric limits, string prefixes, regexes, frozen literals. No env/schema parsing; keep existing `*-env.ts` (or similar) in folder.
+- **`utils.ts`** — Pure helpers (masking, truncation, formatting). Named exports; import from `./constants` when helper needs literal there.
+- **Main class file** — `export class …` (service, sender, adapter), Nest decorators, orchestration; **import** from `./types`, `./constants`, `./utils`.
+
+Prefer `constants.ts` / `utils.ts` at module root (same as `types.ts`), not `foo.constants.ts`, unless folder has established exception.
+
+## Exceptions
+
+- **`*.spec.ts` / `*.test.ts`:** local helpers/fixtures OK in test file.
+- **Barrels:** re-export from `index.ts` only when folder already uses barrel pattern.
+
+## Bad / good
+
+```typescript
+// BAD — const + helpers next to class
+const MAX_LOG_BODY_LENGTH = 500;
+function maskRecipient(recipient: string) { /* ... */ }
+export class EmailYandexPostboxChannelSender { }
+
+// GOOD — constants.ts
+export const MAX_LOG_BODY_LENGTH = 500;
+
+// GOOD — utils.ts
+import { MAX_LOG_BODY_LENGTH } from './constants';
+export function maskRecipient(recipient: string) { /* ... */ }
+
+// GOOD — email-yandex-postbox-channel-sender.ts
+import { maskRecipient, truncateForLog } from './utils';
+export class EmailYandexPostboxChannelSender { }
+```

@@ -1,0 +1,16 @@
+---
+description: This project uses Node.js 25
+alwaysApply: true
+---
+
+# Node Version
+
+Project uses **Node.js 25**.
+
+Set version:
+
+```bash
+nvm use 25
+```
+
+Run before install deps or scripts.

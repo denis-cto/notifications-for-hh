@@ -1,0 +1,71 @@
+---
+description: Keep fleet-admin-api REST and Postman collection in sync with runnable DB examples
+globs: fleet/apps/fleet-admin-api/**
+alwaysApply: false
+---
+
+# Fleet Admin API — Postman Sync
+
+Any **REST endpoint** created, updated, or deleted in `fleet-admin-api`:
+
+1. Update `fleet/apps/fleet-admin-api/postman/fleet-admin-api.postman_collection.json`.
+2. Mirror **every** public HTTP route from controllers (global prefix `api` → paths like `/api/v1/...`). Skip gRPC-only controllers unless explicitly documented elsewhere.
+3. Group requests in folders that match API areas (e.g. **Tenants**, **Cities**).
+
+## Runnable examples
+
+Each request must work **out of the box** after local infra + seeds:
+
+- **Collection variables**: at minimum `baseUrl` (`http://localhost:3020` — `APP_PORT` in `apps/fleet-admin-api/.env.example`).
+- **Real IDs/values** from DB seeds or documented query output — never placeholder UUIDs like `00000000-0000-0000-0000-000000000000`.
+- **Short description** on every request: what it does, which seed row it uses, expected success shape.
+- **POST/PUT bodies**: copy field names from Nest DTOs/controllers; use seed-safe values (e.g. new tenant `slug` with a unique suffix only when create is idempotent-safe).
+
+Prefer **one working example per endpoint**; add a second example when filters or path params meaningfully differ (e.g. allowed vs restricted city check).
+
+## Where to find seed data
+
+| Data | Source |
+|------|--------|
+| Tenant `id`, `slug` (`autopilot`) | `fleet/apps/fleet-prisma/seed-platform.ts` — run seed, copy `tenant.id` from log or DB |
+| Platform city location UUIDs | `backend/apps/location-service/prisma/seed-data-russia.ts` (e.g. Moscow City `732303db-1fc2-55c6-86b0-3736a17b2acb`, SVO `8a70b00c-a674-5b89-bd13-2f53d5e9be75`) |
+| Fleet platform DB | `FLEET_PLATFORM_DATABASE_URL` / `postgresql://resharing:resharing@localhost:5433/fleet_platform` |
+
+Document seed sources in collection `info.description` (same pattern as frontend-api Postman).
+
+## Example structure
+
+```json
+{
+  "name": "List tenants (seed autopilot)",
+  "request": {
+    "method": "GET",
+    "url": { "raw": "{{baseUrl}}/api/v1/tenants" }
+  },
+  "description": "Returns platform tenants. After fleet-prisma seed, includes slug `autopilot`."
+}
+```
+
+```json
+{
+  "name": "Check city allowed — Moscow (autopilot tenant)",
+  "request": {
+    "method": "GET",
+    "url": {
+      "raw": "{{baseUrl}}/api/v1/tenants/{{tenantId}}/cities/check?platformCityLocationId={{moscowCityLocationId}}"
+    }
+  },
+  "description": "`tenantId` from seed-platform; `platformCityLocationId` from location-service Russia seed (RU-MSK)."
+}
+```
+
+Optional: `fleet-admin-api.postman_environment.json` beside the collection for `baseUrl`, `tenantId`, `moscowCityLocationId`.
+
+## Prerequisites (collection readme / info.description)
+
+Note that callers need: fleet Postgres on `5433`, platform seed, and for city checks — location-service data or known seed UUIDs.
+
+## Do not
+
+- Put Postman files under `backend/apps/frontend-api/postman/` for fleet-admin routes.
+- Commit real credentials; use env vars / Postman variables (`{{username}}`, etc.) if auth is added later.

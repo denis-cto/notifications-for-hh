@@ -1,0 +1,62 @@
+---
+description: Application modules and files structure for backend apps
+globs: backend/apps/**/src/app/**/*.ts, fleet/**/*.ts
+alwaysApply: false
+---
+
+# App Module Structure
+
+Every app has modules. Each module in own folder under `app/`. All interfaces, enums, types in `types.ts` in same folder. Many `types.ts` allowed. No exported types in same file as `export class`; see [28-module-types-colocation.mdc](mdc:.cursor/rules/28-module-types-colocation.mdc). Module constants + top-level helpers for class → `constants.ts` and `utils.ts`; see [29-module-constants-utils-colocation.mdc](mdc:.cursor/rules/29-module-constants-utils-colocation.mdc). DB access in `*.repository.ts` only; services inject repositories — see [service-repository-layer.mdc](mdc:.cursor/rules/service-repository-layer.mdc).
+
+## Structure
+
+```
+app/
+  <module-name>/
+    dto/
+      <module-name>.dto.ts
+    controllers/
+      <module-name>.controller.ts
+    <module-name>.module.ts
+    <module-name>.repository.ts
+    <module-name>.service.ts
+    types.ts
+    constants.ts
+    utils.ts
+```
+
+## Rules
+
+- **`*.repository.ts`** — DB access only; injects `PrismaService` (see [service-repository-layer.mdc](mdc:.cursor/rules/service-repository-layer.mdc))
+- **`*.service.ts`** — Business logic; injects repository, not Prisma
+- **`*.module.ts`** — In module folder (e.g. `search/search.module.ts`)
+- **`*.dto.ts`** — In `dto/` subfolder (e.g. `search/dto/search.dto.ts`)
+- **Controllers** — In `controllers/` (e.g. `search/controllers/search.controller.ts`)
+- **Enums, types, interfaces** — In `types.ts` at module root
+- **Module constants** — In `constants.ts` at module root (URLs, limits, literals; not env parsing)
+- **Helper functions** — In `utils.ts` at module root (pure helpers for main class)
+
+## Example
+
+```
+app/
+  search/
+    dto/
+      search.dto.ts
+    controllers/
+      search.controller.ts
+    search.module.ts
+    search.repository.ts
+    search.service.ts
+    types.ts
+    constants.ts
+    utils.ts
+```
+
+## Imports
+
+```typescript
+// In search.controller.ts
+import { SearchDto } from '../dto/search.dto';
+import { SearchResult } from '../types';
+```

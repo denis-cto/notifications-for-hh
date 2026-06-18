@@ -1,0 +1,25 @@
+---
+description: Only frontend-api exposes HTTP for REST; other apps use gRPC for IPC only
+alwaysApply: true
+---
+
+# Backend HTTP vs gRPC Ports
+
+## REST / public HTTP
+
+- **Only `frontend-api`** exposes HTTP for platform **REST API**.
+- No REST controllers, public HTTP routes, or "second gateways" on other `backend/apps/*` for client-facing APIs.
+
+## Inter-process communication
+
+- **All other apps** talk via **gRPC** (gRPC server ports).
+- Prefer gRPC clients from `frontend-api` (and other callers) to backend services; no HTTP client-to-service APIs on non–`frontend-api` apps.
+
+## Ports and deployment
+
+- **Do not** publish/document HTTP listen ports for non–`frontend-api` as product API surface (Docker compose, K8s Services, Postman "REST" for internal services, etc.).
+- Internal tooling (health, metrics, debug) follows existing patterns; no extra HTTP exposure beyond convention.
+
+## When changing APIs
+
+- New/changed **gRPC** contracts: implement in owning service, expose REST via **`frontend-api`** (see `api-postman-sync.mdc`).
