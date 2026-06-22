@@ -1,187 +1,73 @@
 # Notification Preferences Service
 
-Single source of truth for notification delivery preferences. Manages default settings, per-user overrides, global policies, and quiet hours; exposes REST API to read/update preferences and evaluate whether a notification may be sent.
+Сервис предпочтений уведомлений: дефолты, пользовательские настройки, глобальные политики, quiet hours. REST API для чтения/изменения настроек и проверки `allow` / `deny`.
 
-## Quick start (Docker)
+**Стек:** TypeScript, NestJS, PostgreSQL, Prisma.
+
+## Запуск (Docker)
 
 ```bash
 docker compose up --build
 ```
 
-Service: `http://localhost:3000`
+Сервис: http://localhost:3000  
+Проверка: `curl http://localhost:3000/health`
 
-## Local development
+## Запуск локально
 
-### Prerequisites
-
-- Node.js 25
-- PostgreSQL 16 (or use Docker for Postgres only)
-
-### Setup
+**Требования:** Node.js 25, PostgreSQL 16.
 
 ```bash
 cp .env.example .env
 npm install
 
-# Start Postgres (optional if using local instance)
-docker compose up postgres -d
+docker compose up postgres -d   # или свой Postgres
 
-# Run migrations and seed
 npx prisma migrate deploy
 npm run prisma:seed
-
-# Start dev server
 npm run start:dev
 ```
 
-## API
-
-Notification types can be sent in two formats:
-
-- **Separate fields** (recommended): `"notificationType": "marketing"`, `"channel": "email"`
-- **Composite** (assignment spec style): `"notificationType": "marketing_email"` — channel can be omitted
-
-### Get user preferences
+Production-сборка:
 
 ```bash
-curl http://localhost:3000/users/user-1/preferences
+npm run build
+npm run start:prod
 ```
 
-### Update preferences
+## Тесты
 
 ```bash
-curl -X POST http://localhost:3000/users/user-1/preferences \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: optional-unique-key" \
-  -d '{
-    "preferences": [
-      { "notificationType": "marketing", "channel": "email", "enabled": false }
-    ],
-    "quietHours": {
-      "enabled": true,
-      "start": "22:00",
-      "end": "08:00",
-      "timezone": "Europe/Berlin"
-    }
-  }'
+npm test          # unit (domain)
+npm run test:e2e  # e2e (Testcontainers + PostgreSQL)
 ```
 
-### Evaluate notification delivery
+## API (кратко)
 
-Supports both separate fields and composite `notificationType` (e.g. `marketing_sms`).
+| Метод | Путь | Назначение |
+|-------|------|------------|
+| GET | `/users/:id/preferences` | Текущие предпочтения |
+| POST | `/users/:id/preferences` | Изменить настройки / quiet hours |
+| POST | `/evaluate` | Проверить возможность отправки |
+| GET/POST | `/admin/policies` | Глобальные политики |
+| GET/PUT | `/admin/defaults` | Дефолтные предпочтения |
 
-```bash
-curl -X POST http://localhost:3000/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user-1",
-    "notificationType": "marketing",
-    "channel": "sms",
-    "region": "EU",
-    "datetime": "2026-05-21T10:00:00Z"
-  }'
-```
+`notificationType` — отдельно (`marketing` + `email`) или составной (`marketing_email`).
 
-Example response:
+## Архитектура
 
-```json
-{
-  "decision": "deny",
-  "reason": "blocked_by_global_policy",
-  "explanation": "blocked_by_global_policy"
-}
-```
-
-### Admin API (policies and defaults)
-
-```bash
-# List global policies
-curl http://localhost:3000/admin/policies
-
-# Create a regional deny policy
-curl -X POST http://localhost:3000/admin/policies \
-  -H "Content-Type: application/json" \
-  -d '{
-    "notificationType": "marketing",
-    "channel": "push",
-    "region": "US",
-    "effect": "DENY",
-    "reason": "blocked_by_global_policy"
-  }'
-
-# List default preferences
-curl http://localhost:3000/admin/defaults
-
-# Update default preferences
-curl -X PUT http://localhost:3000/admin/defaults \
-  -H "Content-Type: application/json" \
-  -d '{
-    "preferences": [
-      { "notificationType": "marketing", "channel": "messenger", "enabled": true }
-    ]
-  }'
-```
-
-## Tests
-
-```bash
-# Unit tests
-npm test
-
-# E2E tests (uses Testcontainers + PostgreSQL)
-npm run test:e2e
-```
-
-E2E covers all required scenarios:
-
-1. Default preferences for new users
-2. User preference changes
-3. Quiet hours blocking
-4. Global regional policies
-5. Idempotent updates
-
-## Architecture
-
-Hexagonal (ports & adapters) layering:
+Hexagonal (ports & adapters):
 
 ```
-interfaces/http     → REST controllers, DTO validation
-application         → PreferencesService, EvaluateService, repository ports
-domain              → Pure types, QuietHours VO, rule-based PreferenceEvaluator
-infrastructure      → Prisma repositories, logging, metrics seam
+interfaces/http  → REST, DTO
+application      → use cases, порты репозиториев
+domain           → правила, QuietHours, PreferenceEvaluator
+infrastructure   → Prisma, логирование
 ```
 
-### Decision engine
+Решение `evaluate`: глобальные политики → предпочтения → quiet hours.  
+Идемпотентность: upsert по `(userId, type, channel)` + заголовок `Idempotency-Key`.
 
-Evaluation runs as a **Chain of Responsibility** with fixed precedence:
+## Дальше для продакшена
 
-1. **Global policies** (region/type/channel wildcards)
-2. **User/default preferences**
-3. **Quiet hours** (marketing blocked; transactional/security bypass)
-
-New users are not pre-created — defaults are merged lazily from `default_preferences` + `user_preferences`.
-
-### Idempotency
-
-- **State-based**: upserts on `(userId, type, channel)` — repeated identical updates converge
-- **HTTP header**: optional `Idempotency-Key` stored in DB for command deduplication
-
-### Observability
-
-Structured logs (`nestjs-pino`):
-
-- `event=preference_changed` — user preference updates
-- `event=notification_decision` — allow/deny decisions with reason
-
-`MetricsRecorder` port with no-op implementation; wire `prom-client` counters (`decisions_total{decision,reason}`) and histogram (`evaluate_duration_ms`) for production.
-
-## Production next steps
-
-- Authentication/authorization (admin vs user-scoped endpoints)
-- Audit log for preference changes
-- Cache layer for effective preferences (Redis)
-- Event publishing (outbox pattern) on preference changes
-- OpenAPI/Swagger documentation
-- Prometheus metrics + distributed tracing
-- Policy versioning and soft-delete
-- Rate limiting and input sanitization hardening
+Auth, audit log, кэш (Redis), события при изменении настроек, OpenAPI, Prometheus-метрики, rate limiting.
