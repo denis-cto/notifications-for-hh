@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CreateGlobalPolicyInput,
   GlobalPolicyRecord,
+  GlobalPolicyRecordWithId,
   GlobalPolicyRepository,
   UserRecord,
   UserRepository,
 } from '../../../application/ports/repositories';
-import { QuietHoursConfig } from '../../../domain/quiet-hours/quiet-hours';
+import { QuietHoursConfig } from '../../../domain/quiet-hours/type';
 import { PrismaService } from './prisma.service';
-import { toDomainChannel, toDomainNotificationType } from './enum.mapper';
+import { PrismaEnumMapper } from './enum.mapper';
 
 @Injectable()
 export class UserPrismaRepository implements UserRepository {
@@ -68,14 +70,53 @@ export class GlobalPolicyPrismaRepository implements GlobalPolicyRepository {
     const rows = await this.prisma.globalPolicy.findMany({
       where: { enabled: true },
     });
+    return rows.map((row) => this.toRecord(row));
+  }
+
+  async findAll(): Promise<GlobalPolicyRecordWithId[]> {
+    const rows = await this.prisma.globalPolicy.findMany({
+      orderBy: { id: 'asc' },
+    });
     return rows.map((row) => ({
-      type: row.type ? toDomainNotificationType(row.type) : null,
-      channel: row.channel ? toDomainChannel(row.channel) : null,
+      id: row.id,
+      ...this.toRecord(row),
+    }));
+  }
+
+  async create(input: CreateGlobalPolicyInput): Promise<GlobalPolicyRecordWithId> {
+    const row = await this.prisma.globalPolicy.create({
+      data: {
+        type: input.type
+          ? PrismaEnumMapper.toPrismaNotificationType(input.type)
+          : null,
+        channel: input.channel
+          ? PrismaEnumMapper.toPrismaChannel(input.channel)
+          : null,
+        region: input.region ?? null,
+        effect: input.effect,
+        reason: input.reason,
+        enabled: input.enabled ?? true,
+      },
+    });
+    return { id: row.id, ...this.toRecord(row) };
+  }
+
+  private toRecord(row: {
+    type: Parameters<typeof PrismaEnumMapper.toDomainNotificationType>[0] | null;
+    channel: Parameters<typeof PrismaEnumMapper.toDomainChannel>[0] | null;
+    region: string | null;
+    effect: string;
+    reason: string;
+    enabled: boolean;
+  }): GlobalPolicyRecord {
+    return {
+      type: row.type ? PrismaEnumMapper.toDomainNotificationType(row.type) : null,
+      channel: row.channel ? PrismaEnumMapper.toDomainChannel(row.channel) : null,
       region: row.region,
       effect: row.effect as 'DENY' | 'ALLOW',
       reason: row.reason,
       enabled: row.enabled,
-    }));
+    };
   }
 }
 

@@ -1,0 +1,292 @@
+{
+  "info": {
+    "_postman_id": "notification-preferences-service",
+    "name": "Notification Preferences Service",
+    "description": "REST API for notification delivery preferences and evaluation.\n\n**Prerequisites**\n- Start service: `docker compose up --build` or `npm run start:dev` after `npx prisma migrate deploy && npm run prisma:seed`\n- Base URL: `http://localhost:3000` (no auth, no API prefix)\n\n**Seed data** (`prisma/seed.ts`)\n- Defaults: transactional=all channels on; marketing=all off; security=all on\n- Global policy: marketing + SMS + EU → DENY (`blocked_by_global_policy`)\n\n**Enums**\n- `notificationType`: `transactional`, `marketing`, `security`\n- `channel`: `email`, `sms`, `push`, `messenger`\n\n**Evaluation precedence**: global policies → user/default preferences → quiet hours (transactional and security bypass quiet hours).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "userId",
+      "value": "user-1"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "idem-key-123"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness check. Returns `{ \"status\": \"ok\" }`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Preferences",
+      "item": [
+        {
+          "name": "Get preferences - New user defaults",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/new-user-1/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "new-user-1", "preferences"]
+            },
+            "description": "Returns 12 merged preferences for a lazy user (no DB row yet).\n\n**Expected**: transactional=all channels enabled (`source: default`); marketing=all off; security=all on.\n\nNo prior setup required — uses seeded defaults only."
+          },
+          "response": []
+        },
+        {
+          "name": "Get preferences - User with overrides",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/user-scenario-2/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "user-scenario-2", "preferences"]
+            },
+            "description": "Returns preferences after user override.\n\n**Prerequisite**: Run \"Disable marketing email\" POST first.\n\n**Expected**: marketing + email → `enabled: false`, `source: user`; transactional email remains enabled."
+          },
+          "response": []
+        },
+        {
+          "name": "Update preferences - Disable marketing email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferences\": [\n    {\n      \"notificationType\": \"marketing\",\n      \"channel\": \"email\",\n      \"enabled\": false\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/user-scenario-2/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "user-scenario-2", "preferences"]
+            },
+            "description": "Disables marketing email for user-scenario-2.\n\n**Expected**: 200 with updated preferences; marketing email `source: user`, `enabled: false`. Transactional email stays enabled.\n\nE2E scenario 2."
+          },
+          "response": []
+        },
+        {
+          "name": "Update preferences - Enable quiet hours",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferences\": [\n    {\n      \"notificationType\": \"marketing\",\n      \"channel\": \"push\",\n      \"enabled\": true\n    }\n  ],\n  \"quietHours\": {\n    \"enabled\": true,\n    \"start\": \"22:00\",\n    \"end\": \"08:00\",\n    \"timezone\": \"Europe/Berlin\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/user-scenario-3/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "user-scenario-3", "preferences"]
+            },
+            "description": "Enables marketing push and quiet hours (22:00–08:00 Europe/Berlin).\n\n**Prerequisite** for \"Evaluate - Marketing push during quiet hours\".\n\n**Validation**: `start`/`end` must be `HH:mm` 24h; `timezone` validated via Luxon when enabled.\n\nE2E scenario 3."
+          },
+          "response": []
+        },
+        {
+          "name": "Update preferences - Idempotent update with header",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferences\": [\n    {\n      \"notificationType\": \"marketing\",\n      \"channel\": \"push\",\n      \"enabled\": false\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/user-scenario-5b/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "user-scenario-5b", "preferences"]
+            },
+            "description": "Idempotent update using `Idempotency-Key` header.\n\n**Expected**: Sending the same key + body twice returns identical 200 responses.\n\n**409 Conflict**: Reusing the same key with a different body.\n\nE2E scenario 5."
+          },
+          "response": []
+        },
+        {
+          "name": "Update preferences - Preferences only (no quiet hours)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferences\": [\n    {\n      \"notificationType\": \"security\",\n      \"channel\": \"sms\",\n      \"enabled\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "preferences"]
+            },
+            "description": "Partial update — toggles a single preference without quiet hours.\n\nBoth `preferences` and `quietHours` are optional in the body; at least one is typically sent."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Evaluate",
+      "item": [
+        {
+          "name": "Evaluate - Marketing SMS in EU (seed policy)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"any-user\",\n  \"notificationType\": \"marketing\",\n  \"channel\": \"sms\",\n  \"region\": \"EU\",\n  \"datetime\": \"2026-05-21T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/evaluate",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluate"]
+            },
+            "description": "Global policy from seed: marketing SMS in EU is denied.\n\n**Expected**: `decision: deny`, `reason: blocked_by_global_policy`.\n\nNo prior user setup required. E2E scenario 4."
+          },
+          "response": []
+        },
+        {
+          "name": "Evaluate - Transactional email (allowed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-scenario-2\",\n  \"notificationType\": \"transactional\",\n  \"channel\": \"email\",\n  \"region\": \"EU\",\n  \"datetime\": \"2026-05-21T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/evaluate",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluate"]
+            },
+            "description": "Transactional email is allowed by default even when marketing is disabled.\n\n**Prerequisite**: Run \"Disable marketing email\" for user-scenario-2 (optional — transactional is on by default).\n\n**Expected**: `decision: allow`, `reason: allowed` or `allowed_by_default`."
+          },
+          "response": []
+        },
+        {
+          "name": "Evaluate - Marketing push during quiet hours",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-scenario-3\",\n  \"notificationType\": \"marketing\",\n  \"channel\": \"push\",\n  \"region\": \"EU\",\n  \"datetime\": \"2026-05-21T21:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/evaluate",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluate"]
+            },
+            "description": "Marketing push blocked during quiet hours (21:30 UTC = 23:30 Europe/Berlin, inside 22:00–08:00 window).\n\n**Prerequisite**: Run \"Enable quiet hours\" for user-scenario-3 first.\n\n**Expected**: `decision: deny`, `reason: blocked_by_quiet_hours`.\n\nE2E scenario 3."
+          },
+          "response": []
+        },
+        {
+          "name": "Evaluate - Transactional during quiet hours",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-scenario-3\",\n  \"notificationType\": \"transactional\",\n  \"channel\": \"email\",\n  \"region\": \"EU\",\n  \"datetime\": \"2026-05-21T21:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/evaluate",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluate"]
+            },
+            "description": "Transactional notifications bypass quiet hours.\n\n**Prerequisite**: Run \"Enable quiet hours\" for user-scenario-3 (same datetime as marketing push test).\n\n**Expected**: `decision: allow`.\n\nE2E scenario 3."
+          },
+          "response": []
+        },
+        {
+          "name": "Evaluate - Disabled marketing email (user pref)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-scenario-2\",\n  \"notificationType\": \"marketing\",\n  \"channel\": \"email\",\n  \"region\": \"EU\",\n  \"datetime\": \"2026-05-21T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/evaluate",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluate"]
+            },
+            "description": "User-disabled marketing email is denied.\n\n**Prerequisite**: Run \"Disable marketing email\" for user-scenario-2 first.\n\n**Expected**: `decision: deny`, `reason: disabled_by_user`."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

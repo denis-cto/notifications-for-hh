@@ -36,6 +36,11 @@ npm run start:dev
 
 ## API
 
+Notification types can be sent in two formats:
+
+- **Separate fields** (recommended): `"notificationType": "marketing"`, `"channel": "email"`
+- **Composite** (assignment spec style): `"notificationType": "marketing_email"` — channel can be omitted
+
 ### Get user preferences
 
 ```bash
@@ -63,6 +68,8 @@ curl -X POST http://localhost:3000/users/user-1/preferences \
 
 ### Evaluate notification delivery
 
+Supports both separate fields and composite `notificationType` (e.g. `marketing_sms`).
+
 ```bash
 curl -X POST http://localhost:3000/evaluate \
   -H "Content-Type: application/json" \
@@ -83,6 +90,36 @@ Example response:
   "reason": "blocked_by_global_policy",
   "explanation": "blocked_by_global_policy"
 }
+```
+
+### Admin API (policies and defaults)
+
+```bash
+# List global policies
+curl http://localhost:3000/admin/policies
+
+# Create a regional deny policy
+curl -X POST http://localhost:3000/admin/policies \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notificationType": "marketing",
+    "channel": "push",
+    "region": "US",
+    "effect": "DENY",
+    "reason": "blocked_by_global_policy"
+  }'
+
+# List default preferences
+curl http://localhost:3000/admin/defaults
+
+# Update default preferences
+curl -X PUT http://localhost:3000/admin/defaults \
+  -H "Content-Type: application/json" \
+  -d '{
+    "preferences": [
+      { "notificationType": "marketing", "channel": "messenger", "enabled": true }
+    ]
+  }'
 ```
 
 ## Tests

@@ -1,13 +1,9 @@
 import { DateTime } from 'luxon';
+import { QuietHoursConfig } from './type';
+
+export type { QuietHoursConfig } from './type';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-export interface QuietHoursConfig {
-  enabled: boolean;
-  start: string;
-  end: string;
-  timezone: string;
-}
 
 export class QuietHours {
   readonly enabled: boolean;

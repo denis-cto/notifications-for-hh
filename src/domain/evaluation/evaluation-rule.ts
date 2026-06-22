@@ -1,63 +1,46 @@
-import { Channel } from '../channel';
-import { Decision, RuleResult } from '../decision';
+import { Channel, NotificationType, Region } from '../type';
+import { Decision } from '../decision';
+import { NotificationTypeMapper } from '../notification-type';
 import {
-  NotificationType,
-  bypassesQuietHours,
-} from '../notification-type';
-import { Region } from '../region';
-import { QuietHours } from '../quiet-hours/quiet-hours';
-import { PreferenceEntry } from '../preferences/preference-set';
+  EvaluationContext,
+  EvaluationRule,
+  GlobalPolicyRecord,
+  RuleResult,
+} from './type';
 
-export interface EvaluationContext {
-  userId: string;
-  notificationType: NotificationType;
-  channel: Channel;
-  region: Region;
-  datetime: Date;
-  preferences: PreferenceEntry[];
-  quietHours: QuietHours;
-  globalPolicies: GlobalPolicyRecord[];
-}
-
-export interface GlobalPolicyRecord {
-  type: NotificationType | null;
-  channel: Channel | null;
-  region: string | null;
-  effect: 'DENY' | 'ALLOW';
-  reason: string;
-  enabled: boolean;
-}
-
-export interface EvaluationRule {
-  evaluate(context: EvaluationContext): RuleResult;
-}
-
-export function matchesPolicy(
-  policy: GlobalPolicyRecord,
-  type: NotificationType,
-  channel: Channel,
-  region: Region,
-): boolean {
-  if (!policy.enabled) {
-    return false;
-  }
-  if (policy.type !== null && policy.type !== type) {
-    return false;
-  }
-  if (policy.channel !== null && policy.channel !== channel) {
-    return false;
-  }
-  if (policy.region !== null && policy.region !== region) {
-    return false;
-  }
-  return true;
-}
+export type {
+  EvaluationContext,
+  EvaluationRule,
+  GlobalPolicyRecord,
+  RuleResult,
+} from './type';
 
 export class GlobalPolicyRule implements EvaluationRule {
+  static matches(
+    policy: GlobalPolicyRecord,
+    type: NotificationType,
+    channel: Channel,
+    region: Region,
+  ): boolean {
+    if (!policy.enabled) {
+      return false;
+    }
+    if (policy.type !== null && policy.type !== type) {
+      return false;
+    }
+    if (policy.channel !== null && policy.channel !== channel) {
+      return false;
+    }
+    if (policy.region !== null && policy.region !== region) {
+      return false;
+    }
+    return true;
+  }
+
   evaluate(context: EvaluationContext): RuleResult {
     for (const policy of context.globalPolicies) {
       if (
-        matchesPolicy(
+        GlobalPolicyRule.matches(
           policy,
           context.notificationType,
           context.channel,
@@ -106,7 +89,7 @@ export class QuietHoursRule implements EvaluationRule {
 
     if (
       quietHours.isWithin(datetime) &&
-      !bypassesQuietHours(notificationType)
+      !NotificationTypeMapper.bypassesQuietHours(notificationType)
     ) {
       return Decision.deny(
         'blocked_by_quiet_hours',

@@ -5,12 +5,7 @@ import {
   PreferenceUpdate,
 } from '../../../application/ports/repositories';
 import { PrismaService } from './prisma.service';
-import {
-  toDomainChannel,
-  toDomainNotificationType,
-  toPrismaChannel,
-  toPrismaNotificationType,
-} from './enum.mapper';
+import { PrismaEnumMapper } from './enum.mapper';
 
 @Injectable()
 export class UserPreferencePrismaRepository
@@ -23,8 +18,8 @@ export class UserPreferencePrismaRepository
       where: { userId },
     });
     return rows.map((row) => ({
-      type: toDomainNotificationType(row.type),
-      channel: toDomainChannel(row.channel),
+      type: PrismaEnumMapper.toDomainNotificationType(row.type),
+      channel: PrismaEnumMapper.toDomainChannel(row.channel),
       enabled: row.enabled,
     }));
   }
@@ -40,14 +35,14 @@ export class UserPreferencePrismaRepository
         where: {
           userId_type_channel: {
             userId,
-            type: toPrismaNotificationType(pref.notificationType),
-            channel: toPrismaChannel(pref.channel),
+            type: PrismaEnumMapper.toPrismaNotificationType(pref.notificationType),
+            channel: PrismaEnumMapper.toPrismaChannel(pref.channel),
           },
         },
         create: {
           userId,
-          type: toPrismaNotificationType(pref.notificationType),
-          channel: toPrismaChannel(pref.channel),
+          type: PrismaEnumMapper.toPrismaNotificationType(pref.notificationType),
+          channel: PrismaEnumMapper.toPrismaChannel(pref.channel),
           enabled: pref.enabled,
         },
         update: {
@@ -55,8 +50,8 @@ export class UserPreferencePrismaRepository
         },
       });
       results.push({
-        type: toDomainNotificationType(row.type),
-        channel: toDomainChannel(row.channel),
+        type: PrismaEnumMapper.toDomainNotificationType(row.type),
+        channel: PrismaEnumMapper.toDomainChannel(row.channel),
         enabled: row.enabled,
       });
     }

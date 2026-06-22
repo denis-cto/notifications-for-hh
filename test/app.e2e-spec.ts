@@ -110,6 +110,20 @@ describe('Notification Preferences (e2e)', () => {
       expect(marketingEmail.enabled).toBe(false);
       expect(marketingEmail.source).toBe('user');
 
+      const evaluateMarketing = await request(app.getHttpServer())
+        .post('/evaluate')
+        .send({
+          userId,
+          notificationType: 'marketing',
+          channel: 'email',
+          region: 'EU',
+          datetime: '2026-05-21T10:00:00Z',
+        })
+        .expect(200);
+
+      expect(evaluateMarketing.body.decision).toBe('deny');
+      expect(evaluateMarketing.body.reason).toBe('disabled_by_user');
+
       const evaluateTransactional = await request(app.getHttpServer())
         .post('/evaluate')
         .send({
@@ -256,6 +270,110 @@ describe('Notification Preferences (e2e)', () => {
         .expect(200);
 
       expect(second.body).toEqual(first.body);
+
+      const dbCount = await prisma.userPreference.count({
+        where: { userId: userId2 },
+      });
+      expect(dbCount).toBe(1);
+    });
+  });
+
+  describe('Scenario 6: Admin API', () => {
+    it('lists global policies including seeded EU marketing SMS deny', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/admin/policies')
+        .expect(200);
+
+      const euMarketingSms = response.body.find(
+        (p: { region: string; notificationType: string; channel: string }) =>
+          p.region === 'EU' &&
+          p.notificationType === 'marketing' &&
+          p.channel === 'sms',
+      );
+      expect(euMarketingSms).toMatchObject({
+        effect: 'DENY',
+        enabled: true,
+      });
+    });
+
+    it('creates a policy and evaluate respects it', async () => {
+      await request(app.getHttpServer())
+        .post('/admin/policies')
+        .send({
+          notificationType: 'marketing',
+          channel: 'push',
+          region: 'US',
+          effect: 'DENY',
+          reason: 'blocked_by_global_policy',
+        })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .post('/evaluate')
+        .send({
+          userId: 'admin-test-user',
+          notificationType: 'marketing',
+          channel: 'push',
+          region: 'US',
+          datetime: '2026-05-21T10:00:00Z',
+        })
+        .expect(200);
+
+      expect(response.body.decision).toBe('deny');
+      expect(response.body.reason).toBe('blocked_by_global_policy');
+    });
+
+    it('lists and updates default preferences', async () => {
+      const defaults = await request(app.getHttpServer())
+        .get('/admin/defaults')
+        .expect(200);
+
+      expect(defaults.body.length).toBeGreaterThan(0);
+
+      const updated = await request(app.getHttpServer())
+        .put('/admin/defaults')
+        .send({
+          preferences: [
+            {
+              notificationType: 'marketing',
+              channel: 'messenger',
+              enabled: true,
+            },
+          ],
+        })
+        .expect(200);
+
+      const marketingMessenger = updated.body.find(
+        (p: { notificationType: string; channel: string }) =>
+          p.notificationType === 'marketing' && p.channel === 'messenger',
+      );
+      expect(marketingMessenger.enabled).toBe(true);
+
+      const newUser = await request(app.getHttpServer())
+        .get('/users/admin-defaults-user/preferences')
+        .expect(200);
+
+      const pref = newUser.body.preferences.find(
+        (p: { notificationType: string; channel: string }) =>
+          p.notificationType === 'marketing' && p.channel === 'messenger',
+      );
+      expect(pref.enabled).toBe(true);
+      expect(pref.source).toBe('default');
+    });
+
+    it('accepts composite notificationType in evaluate', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/evaluate')
+        .send({
+          userId: 'any-user',
+          notificationType: 'marketing_sms',
+          region: 'EU',
+          datetime: '2026-05-21T10:00:00Z',
+        })
+        .expect(200);
+
+      expect(response.body.decision).toBe('deny');
+      expect(response.body.reason).toBe('blocked_by_global_policy');
     });
   });
 });

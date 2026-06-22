@@ -1,11 +1,10 @@
 import { Decision } from '../decision';
 import {
-  EvaluationContext,
-  EvaluationRule,
   GlobalPolicyRule,
   QuietHoursRule,
   UserPreferenceRule,
 } from './evaluation-rule';
+import { EvaluationContext, EvaluationRule } from './type';
 
 export class PreferenceEvaluator {
   private readonly rules: EvaluationRule[];

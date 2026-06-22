@@ -7,24 +7,13 @@ import {
 } from './ports/repositories';
 import { PreferencesService } from './preferences.service';
 import { PreferenceEvaluator } from '../domain/evaluation/preference-evaluator';
-import { fromApiChannel } from '../domain/channel';
-import { fromApiNotificationType } from '../domain/notification-type';
-import { createRegion } from '../domain/region';
+import { ChannelMapper } from '../domain/channel';
+import { NotificationTargetMapper } from '../domain/notification-target';
+import { RegionMapper } from '../domain/region';
 import { QuietHours } from '../domain/quiet-hours/quiet-hours';
+import { EvaluateInput, EvaluateOutput } from './type';
 
-export interface EvaluateInput {
-  userId: string;
-  notificationType: string;
-  channel: string;
-  region: string;
-  datetime: string;
-}
-
-export interface EvaluateOutput {
-  decision: 'allow' | 'deny';
-  reason: string;
-  explanation?: string;
-}
+export type { EvaluateInput, EvaluateOutput } from './type';
 
 @Injectable()
 export class EvaluateService {
@@ -42,9 +31,11 @@ export class EvaluateService {
   async evaluate(input: EvaluateInput): Promise<EvaluateOutput> {
     const start = Date.now();
 
-    const notificationType = fromApiNotificationType(input.notificationType);
-    const channel = fromApiChannel(input.channel);
-    const region = createRegion(input.region);
+    const { notificationType, channel } = NotificationTargetMapper.fromApi(
+      input.notificationType,
+      input.channel,
+    );
+    const region = RegionMapper.create(input.region);
     const datetime = new Date(input.datetime);
 
     const [preferenceSet, globalPolicies] = await Promise.all([

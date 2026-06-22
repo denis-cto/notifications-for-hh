@@ -1,13 +1,16 @@
-import { Channel } from '../../src/domain/channel';
-import { NotificationType } from '../../src/domain/notification-type';
-import { createRegion } from '../../src/domain/region';
-import { QuietHours } from '../../src/domain/quiet-hours/quiet-hours';
-import { PreferenceEntry } from '../../src/domain/preferences/preference-set';
+import { Channel, NotificationType } from '../type';
+import { Decision } from '../decision';
+import { RegionMapper } from '../region';
+import { QuietHours } from '../quiet-hours/quiet-hours';
+import { PreferenceEntry } from '../preferences/type';
 import {
   GlobalPolicyRecord,
   GlobalPolicyRule,
-} from '../../src/domain/evaluation/evaluation-rule';
-import { PreferenceEvaluator } from '../../src/domain/evaluation/preference-evaluator';
+  QuietHoursRule,
+  UserPreferenceRule,
+} from './evaluation-rule';
+import { PreferenceEvaluator } from './preference-evaluator';
+import { EvaluationContext, EvaluationRule } from './type';
 
 describe('PreferenceEvaluator', () => {
   const basePreferences: PreferenceEntry[] = [
@@ -51,11 +54,13 @@ describe('PreferenceEvaluator', () => {
 
   const evaluator = new PreferenceEvaluator();
 
-  const buildContext = (overrides: Partial<Parameters<typeof evaluator.evaluate>[0]> = {}) => ({
+  const buildContext = (
+    overrides: Partial<EvaluationContext> = {},
+  ): EvaluationContext => ({
     userId: 'user-1',
     notificationType: NotificationType.MARKETING,
     channel: Channel.EMAIL,
-    region: createRegion('EU'),
+    region: RegionMapper.create('EU'),
     datetime: new Date('2026-05-21T10:00:00Z'),
     preferences: basePreferences,
     quietHours,
@@ -153,6 +158,36 @@ describe('PreferenceEvaluator', () => {
     expect(decision.decision).toBe('allow');
     expect(decision.reason).toBe('allowed');
   });
+
+  it('returns allowed_by_default for enabled default preference', () => {
+    const decision = evaluator.evaluate(
+      buildContext({
+        notificationType: NotificationType.TRANSACTIONAL,
+        channel: Channel.EMAIL,
+        preferences: [
+          {
+            notificationType: NotificationType.TRANSACTIONAL,
+            channel: Channel.EMAIL,
+            enabled: true,
+            source: 'default',
+          },
+        ],
+      }),
+    );
+    expect(decision.decision).toBe('allow');
+    expect(decision.reason).toBe('allowed_by_default');
+  });
+
+  it('uses custom rules array when provided', () => {
+    const customRule: EvaluationRule = {
+      evaluate: () =>
+        Decision.deny('blocked_by_global_policy', 'Custom rule'),
+    };
+    const customEvaluator = new PreferenceEvaluator([customRule]);
+    const decision = customEvaluator.evaluate(buildContext());
+    expect(decision.decision).toBe('deny');
+    expect(decision.explanation).toBe('Custom rule');
+  });
 });
 
 describe('Evaluation rule precedence', () => {
@@ -162,7 +197,7 @@ describe('Evaluation rule precedence', () => {
       userId: 'u1',
       notificationType: NotificationType.MARKETING,
       channel: Channel.SMS,
-      region: createRegion('EU'),
+      region: RegionMapper.create('EU'),
       datetime: new Date(),
       preferences: [
         {
@@ -188,5 +223,78 @@ describe('Evaluation rule precedence', () => {
     if (result !== 'continue') {
       expect(result.reason).toBe('blocked_by_global_policy');
     }
+  });
+
+  it('global policy takes precedence over quiet hours', () => {
+    const evaluator = new PreferenceEvaluator();
+    const decision = evaluator.evaluate({
+      userId: 'u1',
+      notificationType: NotificationType.MARKETING,
+      channel: Channel.SMS,
+      region: RegionMapper.create('EU'),
+      datetime: new Date('2026-05-21T21:30:00Z'),
+      preferences: [
+        {
+          notificationType: NotificationType.MARKETING,
+          channel: Channel.SMS,
+          enabled: true,
+          source: 'user',
+        },
+      ],
+      quietHours: QuietHours.create({
+        enabled: true,
+        start: '22:00',
+        end: '08:00',
+        timezone: 'Europe/Berlin',
+      }),
+      globalPolicies: [
+        {
+          type: NotificationType.MARKETING,
+          channel: Channel.SMS,
+          region: 'EU',
+          effect: 'DENY',
+          reason: 'blocked_by_global_policy',
+          enabled: true,
+        },
+      ],
+    });
+    expect(decision.decision).toBe('deny');
+    expect(decision.reason).toBe('blocked_by_global_policy');
+  });
+
+  it('user preference is evaluated before quiet hours', () => {
+    const userRule = new UserPreferenceRule();
+    const quietRule = new QuietHoursRule();
+    const context: EvaluationContext = {
+      userId: 'u1',
+      notificationType: NotificationType.MARKETING,
+      channel: Channel.EMAIL,
+      region: RegionMapper.create('EU'),
+      datetime: new Date('2026-05-21T21:30:00Z'),
+      preferences: [
+        {
+          notificationType: NotificationType.MARKETING,
+          channel: Channel.EMAIL,
+          enabled: false,
+          source: 'default' as const,
+        },
+      ],
+      quietHours: QuietHours.create({
+        enabled: true,
+        start: '22:00',
+        end: '08:00',
+        timezone: 'Europe/Berlin',
+      }),
+      globalPolicies: [],
+    };
+    expect(userRule.evaluate(context)).not.toBe('continue');
+    expect(quietRule.evaluate(context)).not.toBe('continue');
+    const evaluator = new PreferenceEvaluator([
+      new GlobalPolicyRule(),
+      userRule,
+      quietRule,
+    ]);
+    const decision = evaluator.evaluate(context);
+    expect(decision.reason).toBe('disabled_by_default');
   });
 });

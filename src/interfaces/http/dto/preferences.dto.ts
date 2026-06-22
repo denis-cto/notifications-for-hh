@@ -15,9 +15,9 @@ export class PreferenceItemDto {
   @IsNotEmpty()
   notificationType!: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  channel!: string;
+  channel?: string;
 
   @IsBoolean()
   enabled!: boolean;
@@ -60,9 +60,9 @@ export class EvaluateDto {
   @IsNotEmpty()
   notificationType!: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  channel!: string;
+  channel?: string;
 
   @IsString()
   @IsNotEmpty()

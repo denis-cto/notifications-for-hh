@@ -11,20 +11,12 @@ import {
   UserPreferenceRepository,
   UserRepository,
 } from './ports/repositories';
-import {
-  mergePreferences,
-  PreferenceSet,
-} from '../domain/preferences/preference-set';
-import {
-  toApiChannel,
-  fromApiChannel,
-} from '../domain/channel';
-import {
-  toApiNotificationType,
-  fromApiNotificationType,
-} from '../domain/notification-type';
+import { PreferenceEntry, PreferenceSet } from '../domain/preferences/type';
+import { PreferenceSetMerger } from '../domain/preferences/preference-set';
+import { ChannelMapper } from '../domain/channel';
+import { NotificationTypeMapper } from '../domain/notification-type';
+import { NotificationTargetMapper } from '../domain/notification-target';
 import { QuietHours } from '../domain/quiet-hours/quiet-hours';
-import { PreferenceEntry } from '../domain/preferences/preference-set';
 
 @Injectable()
 export class PreferencesService {
@@ -114,15 +106,15 @@ export class PreferencesService {
           timezone: 'UTC',
         };
 
-    return mergePreferences(userId, defaults, userOverrides, quietHours);
+    return PreferenceSetMerger.merge(userId, defaults, userOverrides, quietHours);
   }
 
   toApiResponse(preferenceSet: PreferenceSet) {
     return {
       userId: preferenceSet.userId,
       preferences: preferenceSet.preferences.map((p: PreferenceEntry) => ({
-        notificationType: toApiNotificationType(p.notificationType),
-        channel: toApiChannel(p.channel),
+        notificationType: NotificationTypeMapper.toApi(p.notificationType),
+        channel: ChannelMapper.toApi(p.channel),
         enabled: p.enabled,
         source: p.source,
       })),
@@ -133,7 +125,7 @@ export class PreferencesService {
   parseUpdateInput(body: {
     preferences?: Array<{
       notificationType: string;
-      channel: string;
+      channel?: string;
       enabled: boolean;
     }>;
     quietHours?: {
@@ -145,11 +137,17 @@ export class PreferencesService {
   }): UpdatePreferencesInput {
     return {
       userId: '',
-      preferences: body.preferences?.map((p) => ({
-        notificationType: fromApiNotificationType(p.notificationType),
-        channel: fromApiChannel(p.channel),
-        enabled: p.enabled,
-      })),
+      preferences: body.preferences?.map((p) => {
+        const target = NotificationTargetMapper.fromApi(
+          p.notificationType,
+          p.channel,
+        );
+        return {
+          notificationType: target.notificationType,
+          channel: target.channel,
+          enabled: p.enabled,
+        };
+      }),
       quietHours: body.quietHours,
     };
   }
